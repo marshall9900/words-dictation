@@ -1,0 +1,37 @@
+{
+  "name": "words-dictation-v2-backend",
+  "version": "2.0.0",
+  "description": "Words Dictation v2 后端 - Phase 1: 动态绘本图片+配音",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js",
+    "worker": "node src/queue/worker.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.6.5",
+    "redis": "^4.6.12",
+    "multer": "^1.4.5-lts.1",
+    "joi": "^17.11.0",
+    "axios": "^1.6.5",
+    "express-rate-limit": "^7.1.5",
+    "cos-nodejs-sdk-v5": "^2.14.4",
+    "bull": "^4.12.2",
+    "form-data": "^4.0.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

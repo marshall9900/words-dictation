@@ -1,0 +1,213 @@
+#===============================================
+# Words Dictation v2 - Docker Compose 配置
+# 腾讯云部署优化版
+#===============================================
+
+version: '3.8'
+
+services:
+  # ── 后端 API 服务 ────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: words-backend
+    restart: always
+    ports:
+      - "127.0.0.1:3001:3001"   # 仅本地监听，Nginx 代理访问
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - backend_logs:/app/logs
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 日志配置 - 日志轮转
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        compress: "true"
+        labels: "service"
+    networks:
+      - app-network
+
+  # ── 后台任务队列 Worker ──────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: words-worker
+    command: node src/queue/worker.js
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    # 资源限制 - Worker 可适当减少资源
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "node src/queue/worker.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+        compress: "true"
+    networks:
+      - app-network
+
+  # ── MySQL 8.0 数据库 ─────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: words-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER:-words_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      # MySQL 8.0 性能优化
+      MYSQL_OPTS: --default-authentication-plugin=mysql_native_password
+                  --innodb-buffer-pool-size=256M
+                  --max-connections=200
+                  --character-set-server=utf8mb4
+                  --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3306:3306"   # 仅本地监听
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 初始化脚本目录 (可选)
+      # - ./mysql-init:/docker-entrypoint-initdb.d
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    # MySQL 日志轮转
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+    networks:
+      - app-network
+
+  # ── Redis 7 缓存 ─────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: words-redis
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - "127.0.0.1:6379:6379"   # 仅本地监听
+    volumes:
+      - redis_data:/data
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - app-network
+
+# ── 数据卷定义 ──────────────────────────────────
+volumes:
+  mysql_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/words-dictation/data/mysql
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/words-dictation/data/redis
+  backend_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/words-dictation/logs
+
+# ── 网络定义 ───────────────────────────────────
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
