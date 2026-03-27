@@ -3,12 +3,13 @@ const { query, queryOne } = require('../db');
 
 // ── 用户模型 ──────────────────────────────────────────────
 
-async function createUser({ nickname = '小学生', grade = 1 } = {}) {
+async function createUser({ nickname = '小学生', grade = 1, username = null } = {}) {
   const id = uuidv4();
+  const _username = username || `user_${id.substring(0, 8)}`;
   await query(
-    `INSERT INTO users (id, nickname, grade, total_score, current_streak)
-     VALUES (?, ?, ?, 0, 0)`,
-    [id, nickname, grade]
+    `INSERT INTO users (id, username, nickname, grade, total_score, streak_days, password_hash)
+     VALUES (?, ?, ?, ?, 0, 0, 'GUEST_NO_PASSWORD')`,
+    [id, _username, nickname, grade]
   );
   return findUserById(id);
 }
@@ -18,7 +19,7 @@ async function findUserById(id) {
 }
 
 async function updateUser(id, fields) {
-  const allowed = ['nickname', 'grade', 'avatar_url', 'total_score', 'current_streak'];
+  const allowed = ['nickname', 'grade', 'avatar_url', 'total_score', 'streak_days'];
   const updates = Object.entries(fields)
     .filter(([k]) => allowed.includes(k))
     .map(([k]) => `${k} = ?`);

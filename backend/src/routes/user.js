@@ -60,7 +60,7 @@ function formatUser(u) {
     avatarUrl: u.avatar_url,
     grade: u.grade,
     totalScore: u.total_score,
-    currentStreak: u.current_streak,
+    currentStreak: u.current_streak ?? u.streak_days ?? 0,
     // Fix: 添加 is_premium 字段，前端依赖此字段判断用户类型
     // Phase 2: 产品分层时再做校验逻辑
     is_premium: u.is_premium || false,
