@@ -18,8 +18,9 @@ let _mock = null;
  * Phase 1: MiniMax
  */
 function getImageProvider() {
-  if (!process.env.MINIMAX_API_KEY) {
-    console.warn('[AI] MINIMAX_API_KEY not set, using MockProvider for image generation');
+  const key = process.env.MINIMAX_API_KEY;
+  if (!key || key.startsWith('test') || key === 'your_minimax_api_key') {
+    console.warn('[AI] MINIMAX_API_KEY not set or invalid, using MockProvider for image generation');
     return getMockProvider();
   }
   if (!_minimax) _minimax = new MiniMaxProvider();
@@ -31,8 +32,9 @@ function getImageProvider() {
  * Phase 1: MiniMax TTS
  */
 function getTTSProvider() {
-  if (!process.env.MINIMAX_API_KEY) {
-    console.warn('[AI] MINIMAX_API_KEY not set, using MockProvider for TTS');
+  const key = process.env.MINIMAX_API_KEY;
+  if (!key || key.startsWith('test') || key === 'your_minimax_api_key') {
+    console.warn('[AI] MINIMAX_API_KEY not set or invalid, using MockProvider for TTS');
     return getMockProvider();
   }
   if (!_minimax) _minimax = new MiniMaxProvider();
