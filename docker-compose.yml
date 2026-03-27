@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=words_dictation_v2
+      - DB_USER=root
+      - DB_PASSWORD=dictation_pass
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - ./backend/.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  worker:
+    build: ./backend
+    command: node src/queue/worker.js
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=words_dictation_v2
+      - DB_USER=root
+      - DB_PASSWORD=dictation_pass
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - backend
+      - mysql
+      - redis
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: dictation_pass
+      MYSQL_DATABASE: words_dictation_v2
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge
